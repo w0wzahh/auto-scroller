@@ -27,8 +27,10 @@ jobs:
             chmod +x ./gradlew
             ./gradlew :app:assembleDebug --no-daemon --stacktrace
           else
-            sudo apt-get update
-            sudo apt-get install -y gradle
+            echo "Downloading Gradle 8.4"
+            wget https://services.gradle.org/distributions/gradle-8.4-bin.zip -O gradle-8.4-bin.zip
+            unzip gradle-8.4-bin.zip -d gradle-dist
+            export PATH="$PWD/gradle-dist/gradle-8.4/bin:$PATH"
             gradle -p app assembleDebug --no-daemon --stacktrace
           fi
 
