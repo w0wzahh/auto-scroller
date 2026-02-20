@@ -34,8 +34,14 @@ jobs:
             gradle -p app assembleDebug --no-daemon --stacktrace
           fi
 
-      - name: Upload debug APK artifact
+      - name: Prepare APK artifact name
+        run: |
+          mkdir -p artifacts
+          # prefer app-debug.apk but copy to auto-scroller.apk for upload
+          cp app/build/outputs/apk/debug/app-debug.apk artifacts/auto-scroller.apk || true
+
+      - name: Upload APK artifact as auto-scroller
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: auto-scroller
+          path: artifacts/auto-scroller.apk
