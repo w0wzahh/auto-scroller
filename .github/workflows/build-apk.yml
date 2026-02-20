@@ -21,15 +21,15 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      - name: Build debug APK (use gradlew if present, else install gradle)
+      - name: Build debug APK (target `app` module)
         run: |
           if [ -f ./gradlew ]; then
             chmod +x ./gradlew
-            ./gradlew assembleDebug --no-daemon --stacktrace
+            ./gradlew :app:assembleDebug --no-daemon --stacktrace
           else
             sudo apt-get update
             sudo apt-get install -y gradle
-            gradle assembleDebug --no-daemon --stacktrace
+            gradle -p app assembleDebug --no-daemon --stacktrace
           fi
 
       - name: Upload debug APK artifact
