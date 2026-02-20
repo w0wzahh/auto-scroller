@@ -3,6 +3,10 @@ package com.example.mangascroller
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.compose.foundation.Image
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.util.zip.ZipInputStream
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -70,6 +74,9 @@ fun MangaReaderScreen(folderUri: Uri) {
     LaunchedEffect(folderUri) {
         images.clear()
 
+        val cacheDir = File(context.cacheDir, "manga_cache/${DocumentsContract.getTreeDocumentId(folderUri)}")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
             folderUri,
             DocumentsContract.getTreeDocumentId(folderUri)
@@ -77,7 +84,11 @@ fun MangaReaderScreen(folderUri: Uri) {
 
         val cursor = context.contentResolver.query(
             childrenUri,
-            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME
+            ),
             null,
             null,
             null
@@ -86,8 +97,57 @@ fun MangaReaderScreen(folderUri: Uri) {
         cursor?.use {
             while (it.moveToNext()) {
                 val docId = it.getString(0)
+                val mime = it.getString(1) ?: ""
+                val name = it.getString(2) ?: ""
                 val fileUri = DocumentsContract.buildDocumentUriUsingTree(folderUri, docId)
-                images.add(fileUri)
+
+                try {
+                    // If it's an image file, add directly
+                    if (mime.startsWith("image/") || name.endsWith(".jpg", true) || name.endsWith(".jpeg", true) || name.endsWith(".png", true) || name.endsWith(".webp", true)) {
+                        images.add(fileUri)
+                        continue
+                    }
+
+                    // If it's a CBZ/ZIP archive, extract image entries to cache and add those files
+                    if (name.endsWith(".cbz", true) || name.endsWith(".zip", true)) {
+                        val input = context.contentResolver.openInputStream(fileUri)
+                        if (input != null) {
+                            ZipInputStream(BufferedInputStream(input)).use { zip ->
+                                var entry = zip.nextEntry
+                                while (entry != null) {
+                                    val entryName = entry.name
+                                    if (!entry.isDirectory && (entryName.endsWith(".jpg", true) || entryName.endsWith(".jpeg", true) || entryName.endsWith(".png", true) || entryName.endsWith(".webp", true))) {
+                                        val outFile = File(cacheDir, entryName)
+                                        outFile.parentFile?.mkdirs()
+                                        FileOutputStream(outFile).use { out ->
+                                            zip.copyTo(out)
+                                        }
+                                        images.add(android.net.Uri.fromFile(outFile))
+                                    }
+                                    entry = zip.nextEntry
+                                }
+                            }
+                        }
+                        continue
+                    }
+
+                    // If it's a directory, attempt to enumerate its children
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        val subChildren = DocumentsContract.buildChildDocumentsUriUsingTree(folderUri, docId)
+                        val subCursor = context.contentResolver.query(subChildren, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
+                        subCursor?.use { sc ->
+                            while (sc.moveToNext()) {
+                                val subId = sc.getString(0)
+                                val subName = sc.getString(2) ?: ""
+                                val subUri = DocumentsContract.buildDocumentUriUsingTree(folderUri, subId)
+                                if (subName.endsWith(".jpg", true) || subName.endsWith(".png", true) || subName.endsWith(".jpeg", true) || subName.endsWith(".webp", true)) {
+                                    images.add(subUri)
+                                }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                }
             }
         }
 
