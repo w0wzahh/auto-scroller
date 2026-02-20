@@ -14,8 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.SnapshotStateMap
-import androidx.compose.runtime.snapshots.snapshotFlow
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -105,10 +104,15 @@ fun MangaReaderScreen(folderUri: Uri) {
         }
     }
 
-    // Auto-scroll loop (pixel based)
+    // Auto-scroll loop (pixel based) - use scrollToItem with offset increment
     LaunchedEffect(autoScroll, speed) {
         while (autoScroll && images.isNotEmpty()) {
-            listState.scrollBy(speed)
+            val index = listState.firstVisibleItemIndex
+            val offset = listState.firstVisibleItemScrollOffset + speed.toInt()
+            try {
+                listState.scrollToItem(index, offset)
+            } catch (_: Exception) {
+            }
             delay(16L)
         }
     }
